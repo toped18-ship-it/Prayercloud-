@@ -1,0 +1,6 @@
+{
+  "name": "PRAYERCLOUD",
+  "description": "A global Christian missionary hub for prayer, strategy, and unreached people group collaboration.",
+  "requestFramePermissions": ["camera", "microphone"],
+  "majorCapabilities": ["real-time-chat", "resource-sharing", "unreached-peoples-database", "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,86 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Platform user profile including role and basic info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "fullName": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Super Admin", "Admin", "Missionary", "Pastor", "Evangelist", "Prayer Warrior", "Intercessor"] },
+        "country": { "type": "string" }
+      },
+      "required": ["uid", "fullName", "email", "role"]
+    },
+    "Country": {
+      "title": "Country",
+      "description": "National data for missional tracking.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "flag": { "type": "string" },
+        "population": { "type": "number" },
+        "religion": { "type": "string" },
+        "christianPercentage": { "type": "number" },
+        "unreachedPercentage": { "type": "number" },
+        "unreachedGroupsCount": { "type": "number" },
+        "riskLevel": { "type": "string", "enum": ["Low", "Moderate", "High", "Extreme"] },
+        "prayerPoints": { "type": "array", "items": { "type": "string" } },
+        "historicalContext": { "type": "string" }
+      },
+      "required": ["id", "name", "population", "religion"]
+    },
+    "UPG": {
+      "title": "Unreached People Group",
+      "description": "Specific ethnic groups within a country that have minimal gospel access.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "countryId": { "type": "string" },
+        "name": { "type": "string" },
+        "population": { "type": "number" },
+        "language": { "type": "string" },
+        "religion": { "type": "string" },
+        "status": { "type": "string", "enum": ["Unreached", "Reached", "Partially Reached"] }
+      },
+      "required": ["id", "countryId", "name", "status"]
+    },
+    "PrayerRequest": {
+      "title": "Prayer Request",
+      "description": "Global prayer submission for members to intercede.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string" },
+        "urgency": { "type": "string", "enum": ["Low", "Normal", "High", "Urgent"] },
+        "prayedCount": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorId", "content", "category", "urgency", "createdAt"]
+    }
+  },
+  "firestore": {
+    "users": {
+      "schema": "User",
+      "description": "Collection of user profiles."
+    },
+    "countries": {
+      "schema": "Country",
+      "description": "Collection of country data."
+    },
+    "upgs": {
+      "schema": "UPG",
+      "description": "Collection of Unreached People Groups."
+    },
+    "prayerRequests": {
+      "schema": "PrayerRequest",
+      "description": "Collection of global prayer requests."
+    }
+  }
+}

@@ -1,0 +1,452 @@
+// PRAYERCLOUD Prisma Schema
+// Global Christian Missionary Platform
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  ADMIN
+  MISSIONARY
+  PASTOR
+  EVANGELIST
+  PRAYER_WARRIOR
+  INTERCESSOR
+}
+
+enum RiskLevel {
+  LOW
+  MODERATE
+  HIGH
+  EXTREME
+}
+
+enum GospelStatus {
+  UNREACHED
+  MINIMALLY_REACHED
+  PARTIALLY_REACHED
+  REACHED
+}
+
+enum UrgencyLevel {
+  LOW
+  NORMAL
+  HIGH
+  CRITICAL
+}
+
+enum CallType {
+  VOICE
+  VIDEO
+  HYBRID_MEETING
+}
+
+enum CallStatus {
+  SCHEDULED
+  ACTIVE
+  ENDED
+  MISSED
+}
+
+model User {
+  id                String             @id @default(cuid())
+  uid               String             @unique // Firebase Auth UID
+  fullName          String
+  username          String             @unique
+  email             String             @unique
+  phoneNumber       String?
+  passwordHash      String?
+  role              UserRole           @default(PRAYER_WARRIOR)
+  country           String             @default("Global")
+  bio               String?
+  avatarUrl         String?
+  isVerified        Boolean            @default(false)
+  twoFactorEnabled  Boolean            @default(false)
+  mustChangePassword Boolean           @default(false)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  prayerRequests    PrayerRequest[]
+  prayerResponses   PrayerResponse[]
+  missionReports    MissionReport[]
+  chatMemberships   ChatMember[]
+  sentMessages      Message[]
+  callParticipants  CallParticipant[]
+  eventParticipants EventParticipant[]
+  auditLogs         AuditLog[]
+  resources         Resource[]
+
+  @@map("users")
+}
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String
+  permissions String[]
+  createdAt   DateTime @default(now())
+
+  @@map("roles")
+}
+
+model Country {
+  id                    String            @id // ISO code or slug, e.g. "somalia", "afghanistan"
+  name                  String            @unique
+  flagEmoji             String            @default("🏳️")
+  flagUrl               String?
+  continent             String            @default("Asia")
+  population            Int               @default(0)
+  dominantReligion      String            @default("")
+  christianPercent      Float             @default(0.0)
+  unreachedPercent      Float             @default(0.0)
+  unreachedGroupsCount  Int               @default(0)
+  riskLevel             RiskLevel         @default(MODERATE)
+  securityNotes         String?
+  prayerPoints          String[]
+  missionOpportunities  String[]
+  overview              String?
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+
+  states                State[]
+  peopleGroups          PeopleGroup[]
+  unreachedPlaces       UnreachedPlace[]
+  prayerRequests        PrayerRequest[]
+  missionReports        MissionReport[]
+
+  @@map("countries")
+}
+
+model State {
+  id          String           @id @default(cuid())
+  name        String
+  countryId   String
+  country     Country          @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  cities      City[]
+  unreached   UnreachedPlace[]
+  createdAt   DateTime         @default(now())
+
+  @@map("states")
+}
+
+model City {
+  id          String           @id @default(cuid())
+  name        String
+  stateId     String
+  state       State            @relation(fields: [stateId], references: [id], onDelete: Cascade)
+  villages    Village[]
+  unreached   UnreachedPlace[]
+  createdAt   DateTime         @default(now())
+
+  @@map("cities")
+}
+
+model Village {
+  id          String           @id @default(cuid())
+  name        String
+  cityId      String
+  city        City             @relation(fields: [cityId], references: [id], onDelete: Cascade)
+  unreached   UnreachedPlace[]
+  createdAt   DateTime         @default(now())
+
+  @@map("villages")
+}
+
+model PeopleGroup {
+  id              String       @id @default(cuid())
+  name            String
+  countryId       String
+  country         Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  population      Int          @default(0)
+  language        String       @default("")
+  primaryReligion String       @default("")
+  gospelStatus    GospelStatus @default(UNREACHED)
+  bibleStatus     String       @default("Portions Only")
+  photoUrl        String?
+  prayerNeeds     String[]
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@map("people_groups")
+}
+
+model UnreachedPlace {
+  id                 String       @id @default(cuid())
+  name               String
+  type               String       // "City", "Village", "Valley", "Tribal Territory"
+  countryId          String
+  country            Country      @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  stateId            String?
+  state              State?       @relation(fields: [stateId], references: [id])
+  cityId             String?
+  city               City?        @relation(fields: [cityId], references: [id])
+  villageId          String?
+  village            Village?     @relation(fields: [villageId], references: [id])
+  population         Int          @default(0)
+  mainReligion       String       @default("")
+  languages          String[]
+  gospelAccess       GospelStatus @default(UNREACHED)
+  churchCount        Int          @default(0)
+  bibleAvailability  String       @default("None")
+  missionaryPresence String       @default("None")
+  prayerRequests     String[]
+  photos             String[]
+  latitude           Float?
+  longitude          Float?
+  riskNotes          String?
+  recommendations    String?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@map("unreached_places")
+}
+
+model PrayerRequest {
+  id              String           @id @default(cuid())
+  authorId        String
+  author          User             @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  title           String
+  content         String
+  category        String           @default("UPG") // Country, Missionary, Personal, Crisis
+  targetCountryId String?
+  targetCountry   Country?         @relation(fields: [targetCountryId], references: [id])
+  urgency         UrgencyLevel     @default(NORMAL)
+  isAnonymous     Boolean          @default(false)
+  prayedCount     Int              @default(0)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  responses       PrayerResponse[]
+
+  @@map("prayer_requests")
+}
+
+model PrayerResponse {
+  id              String        @id @default(cuid())
+  prayerRequestId String
+  prayerRequest   PrayerRequest @relation(fields: [prayerRequestId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message         String
+  createdAt       DateTime      @default(now())
+
+  @@map("prayer_responses")
+}
+
+model ChatRoom {
+  id          String        @id @default(cuid())
+  name        String
+  description String?
+  isDirect    Boolean       @default(false)
+  isCountryRoom Boolean     @default(false)
+  countryId   String?
+  avatarUrl   String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  members     ChatMember[]
+  messages    Message[]
+
+  @@map("chat_rooms")
+}
+
+model ChatMember {
+  id        String   @id @default(cuid())
+  roomId    String
+  room      ChatRoom @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  isAdmin   Boolean  @default(false)
+  joinedAt  DateTime @default(now())
+
+  @@unique([roomId, userId])
+  @@map("chat_members")
+}
+
+model Message {
+  id          String              @id @default(cuid())
+  roomId      String
+  room        ChatRoom            @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  senderId    String
+  sender      User                @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content     String
+  voiceUrl    String?
+  voiceDuration Int?              // in seconds
+  isPinned    Boolean             @default(false)
+  reactions   Json?               // { "🙏": ["uid1"], "❤️": ["uid2"] }
+  createdAt   DateTime            @default(now())
+
+  attachments MessageAttachment[]
+
+  @@map("messages")
+}
+
+model MessageAttachment {
+  id        String   @id @default(cuid())
+  messageId String
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  url       String
+  name      String
+  size      Int
+  fileType  String
+  createdAt DateTime @default(now())
+
+  @@map("message_attachments")
+}
+
+model CallSession {
+  id          String            @id @default(cuid())
+  channelName String            @unique
+  callType    CallType          @default(VIDEO)
+  status      CallStatus        @default(ACTIVE)
+  startedAt   DateTime          @default(now())
+  endedAt     DateTime?
+  duration    Int?              // in seconds
+
+  participants CallParticipant[]
+  recordings   Recording[]
+
+  @@map("call_sessions")
+}
+
+model CallParticipant {
+  id          String      @id @default(cuid())
+  callId      String
+  call        CallSession @relation(fields: [callId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  joinedAt    DateTime    @default(now())
+  leftAt      DateTime?
+  isMuted     Boolean     @default(false)
+  isVideoOff  Boolean     @default(false)
+
+  @@map("call_participants")
+}
+
+model Recording {
+  id          String       @id @default(cuid())
+  callId      String?
+  call        CallSession? @relation(fields: [callId], references: [id], onDelete: SetNull)
+  title       String
+  type        String       // "voice_call", "video_call", "prayer_meeting"
+  url         String
+  duration    String
+  size        String
+  storageType String       @default("Local/S3")
+  createdAt   DateTime     @default(now())
+
+  @@map("recordings")
+}
+
+model MissionReport {
+  id          String   @id @default(cuid())
+  authorId    String
+  author      User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  countryId   String
+  country     Country  @relation(fields: [countryId], references: [id], onDelete: Cascade)
+  title       String
+  content     String
+  testimonies String?
+  challenges  String?
+  needs       String?
+  photos      String[]
+  videoUrls   String[]
+  isVerified  Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("mission_reports")
+}
+
+model Event {
+  id          String             @id @default(cuid())
+  title       String
+  description String
+  location    String             @default("PrayerCloud Global Room")
+  meetingUrl  String?
+  isVirtual   Boolean            @default(true)
+  startTime   DateTime
+  endTime     DateTime
+  category    String             @default("Prayer")
+  createdAt   DateTime           @default(now())
+
+  participants EventParticipant[]
+
+  @@map("events")
+}
+
+model EventParticipant {
+  id        String   @id @default(cuid())
+  eventId   String
+  event     Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status    String   @default("Attending") // Attending, Maybe, Declined
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, userId])
+  @@map("event_participants")
+}
+
+model Resource {
+  id          String   @id @default(cuid())
+  title       String
+  category    String   // Security, Field Manual, Translation, Discipleship
+  type        String   // PDF, DOCX, AUDIO, VIDEO
+  size        String
+  url         String
+  uploaderId  String?
+  uploader    User?    @relation(fields: [uploaderId], references: [id], onDelete: SetNull)
+  downloads   Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  @@map("resources")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String
+  type      String   // message, call, prayer, report, event
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@map("notifications")
+}
+
+model SiteSetting {
+  id             String   @id @default("default")
+  siteName       String   @default("PRAYERCLOUD")
+  logoUrl        String?
+  faviconUrl     String?
+  primaryColor   String   @default("#2563EB")
+  secondaryColor String   @default("#0EA5E9")
+  heroTitle      String   @default("Praying Strategically for Every Unreached Nation, Tribe, and Village")
+  heroSubtitle   String   @default("Connecting missionaries, intercessors, and pastors with real-time prayer, unreached place insights, and secure collaboration.")
+  contactEmail   String   @default("contact@prayercloud.org")
+  contactPhone   String   @default("+1 (800) 555-PRAY")
+  footerText     String   @default("© 2026 PRAYERCLOUD Global Missionary Alliance. All rights reserved.")
+  updatedAt      DateTime @updatedAt
+
+  @@map("site_settings")
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  details   String
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@map("audit_logs")
+}

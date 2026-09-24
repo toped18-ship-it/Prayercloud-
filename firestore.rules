@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Global Helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function hasRole(roles) {
+      return isVerified() && getUserData().role in roles;
+    }
+
+    function isAdmin() {
+      return hasRole(['Admin', 'Super Admin']) || request.auth.token.email == 'dtemitope60@gmail.com';
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    // --- Users Collection ---
+    match /users/{userId} {
+      function isValidUser(data) {
+        return data.fullName is string && data.fullName.size() <= 100 &&
+               data.email is string && data.email.size() <= 100 &&
+               data.role is string &&
+               data.uid == userId;
+      }
+
+      allow get: if isVerified() && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+      allow create: if isVerified() && request.auth.uid == userId && isValidUser(incoming()) && incoming().role == 'Missionary'; // Default role for new users
+      allow update: if isVerified() && request.auth.uid == userId && isValidUser(incoming()) &&
+                      incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'username', 'country']) &&
+                      incoming().role == existing().role; // Users cannot change their own roles
+      allow write: if isAdmin();
+    }
+
+    // --- Countries Collection ---
+    match /countries/{countryId} {
+      function isValidCountry(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.population is number &&
+               data.religion is string &&
+               isValidId(data.id);
+      }
+
+      allow read: if isVerified();
+      allow write: if isAdmin() && isValidCountry(incoming());
+    }
+
+    // --- UPGs Collection ---
+    match /upgs/{upgId} {
+      function isValidUPG(data) {
+        return data.name is string && data.name.size() <= 100 &&
+               data.countryId is string &&
+               data.status in ['Unreached', 'Reached', 'Partially Reached'] &&
+               isValidId(data.id);
+      }
+
+      allow read: if isVerified();
+      allow write: if isAdmin() && isValidUPG(incoming());
+    }
+
+    // --- Prayer Requests Collection ---
+    match /prayerRequests/{requestId} {
+      function isValidPrayer(data) {
+        return data.content is string && data.content.size() <= 2000 &&
+               data.authorId == request.auth.uid &&
+               data.createdAt == request.time &&
+               isValidId(data.id);
+      }
+
+      allow read: if isVerified() && resource.data.authorId == request.auth.uid; // Secured list/get
+      allow list: if isVerified() && resource.data.authorId == request.auth.uid;
+      
+      // Public reading if admin or if the app allows it (usually prayer requests are shared)
+      allow read: if isVerified(); 
+
+      allow create: if isVerified() && isValidPrayer(incoming());
+      allow update: if isVerified() && (
+        // Author can update content
+        (request.auth.uid == existing().authorId && incoming().diff(existing()).affectedKeys().hasOnly(['content', 'category', 'urgency']) && isValidPrayer(incoming())) ||
+        // Anyone can increment prayedCount (Relational Sync)
+        (incoming().diff(existing()).affectedKeys().hasOnly(['prayedCount']) && incoming().prayedCount == existing().prayedCount + 1) ||
+        isAdmin()
+      );
+      allow delete: if isVerified() && (request.auth.uid == existing().authorId || isAdmin());
+    }
+  }
+}
